@@ -41,4 +41,4 @@ set MODEL_NAME=qwen-turbo
 
 # Windows (PowerShell)
 $env:DASHSCOPE_API_KEY="your-api-key-here"
-$env:MODEL_NAME="qwen-turbo"
+$env:MODEL_NAME="qwen-turbo""# 111" 

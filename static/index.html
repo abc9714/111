@@ -1,0 +1,352 @@
+<!-- static/index.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>千问智能助手 - 阿里云通义千问聊天机器人</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .chat-header p {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f5f7fa;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+
+        .user .message-content {
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .assistant .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .input-area {
+            background: white;
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-area input:focus {
+            border-color: #4a90e2;
+        }
+
+        .input-area button {
+            background: linear-gradient(135deg, #4a90e2, #357abd);
+            color: white;
+            border: none;
+            padding: 0 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+
+        .input-area button:hover:not(:disabled) {
+            transform: scale(1.02);
+            opacity: 0.9;
+        }
+
+        .input-area button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 5px;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 18px;
+            width: fit-content;
+            border: 1px solid #e0e0e0;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🤖 千问智能助手</h1>
+            <p>基于阿里云通义千问大模型 | 支持多轮对话</p>
+        </div>
+        <div class="messages-area" id="messagesArea">
+            <div class="message assistant">
+                <div class="message-content">
+                    你好！我是千问智能助手，有什么可以帮助你的吗？😊
+                </div>
+            </div>
+        </div>
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="输入你的问题..." autocomplete="off">
+            <button id="sendBtn">发送</button>
+        </div>
+    </div>
+
+    <script>
+        // 消息历史数组（包含系统提示）
+        let messages = [
+            { role: "system", content: "你是一个乐于助人、友好专业的智能助理，名为千问助手。请用中文回复，回答要准确、简洁、有帮助。" }
+        ];
+
+        // 初始显示欢迎消息（assistant消息，但不影响对话历史？可以添加一条assistant消息让模型知道已经问候过）
+        // 为了让对话更自然，再添加一条 assistant 问候记录到消息历史
+        messages.push({ role: "assistant", content: "你好！我是千问智能助手，有什么可以帮助你的吗？😊" });
+
+        // DOM 元素
+        const messagesArea = document.getElementById('messagesArea');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        // 渲染聊天界面（只显示user和assistant消息）
+        function renderMessages() {
+            // 清空消息区域，但保留最后一条错误提示占位我们可以重新构建
+            const allMessages = messages.filter(msg => msg.role !== 'system');
+            messagesArea.innerHTML = '';
+
+            for (const msg of allMessages) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${msg.role}`;
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = msg.content;
+                messageDiv.appendChild(contentDiv);
+                messagesArea.appendChild(messageDiv);
+            }
+            // 滚动到底部
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        // 显示加载动画
+        let loadingElement = null;
+        function showTypingIndicator() {
+            if (loadingElement) return;
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message assistant';
+            typingDiv.id = 'typingIndicator';
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = '<span></span><span></span><span></span>';
+            typingDiv.appendChild(indicator);
+            messagesArea.appendChild(typingDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+            loadingElement = typingDiv;
+        }
+
+        function hideTypingIndicator() {
+            if (loadingElement) {
+                loadingElement.remove();
+                loadingElement = null;
+            }
+        }
+
+        // 显示错误信息
+        function showError(errorMsg) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = `❌ ${errorMsg}`;
+            messagesArea.appendChild(errorDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 3000);
+        }
+
+        // 发送消息到后端
+        async function sendMessage() {
+            const userInput = messageInput.value.trim();
+            if (!userInput) return;
+
+            // 清空输入框并禁用发送按钮
+            messageInput.value = '';
+            sendBtn.disabled = true;
+
+            // 将用户消息添加到历史记录并渲染
+            messages.push({ role: "user", content: userInput });
+            renderMessages();
+
+            // 显示"正在输入"动画
+            showTypingIndicator();
+
+            try {
+                // 调用后端API，传递完整消息历史（包括system和assistant的历史）
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ messages: messages }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '请求失败');
+                }
+
+                const data = await response.json();
+                // 将AI回复添加到消息历史
+                const assistantMessage = { role: data.role, content: data.content };
+                messages.push(assistantMessage);
+                // 重新渲染（会显示新消息）
+                hideTypingIndicator();
+                renderMessages();
+            } catch (error) {
+                console.error('发送消息出错:', error);
+                hideTypingIndicator();
+                showError(error.message || '网络错误，请稍后重试');
+                // 如果出错，移除刚刚添加的用户消息（或者保留但标记错误？简单点不移除，让用户知道发过了但没回音，更合理是不移除，提示错误）
+                // 由于已经渲染了用户消息且添加到messages，如果再移除会状态不一致，我们保留但提示错误，用户可以选择重试
+                // 为了让体验更好，可以直接不移除，提示错误就好
+            } finally {
+                sendBtn.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        // 监听发送按钮和回车键
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !sendBtn.disabled) {
+                sendMessage();
+            }
+        });
+
+        // 初始化渲染
+        renderMessages();
+        messageInput.focus();
+    </script>
+</body>
+</html>
